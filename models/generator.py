@@ -4,23 +4,27 @@ import torch.nn.functional as F
 from numpy import random
 
 class residual_block(nn.Module):
-    def __init__(self, hidden_dimension, use_bias):
+    def __init__(self, hidden_dimension, use_bias, norm):
         super(residual_block, self).__init__()
     
         # Residual (Transform)
         self.residual = nn.Sequential(
             nn.ReflectionPad2d(1),
             nn.Conv2d(4*hidden_dimension, 4*hidden_dimension, 3 ,1, 0, bias=use_bias),
-            nn.InstanceNorm2d(4*hidden_dimension),
+            norm(4*hidden_dimension),
             nn.ReLU(inplace=True),
 
             nn.ReflectionPad2d(1),
             nn.Conv2d(4*hidden_dimension, 4*hidden_dimension, 3 ,1, 0, bias=use_bias),
-            nn.InstanceNorm2d(4*hidden_dimension),
+            norm(4*hidden_dimension),
         )
 
     def forward(self, x):
-        return F.relu(x + self.residual(x))
+        residual_relu = False
+        if residual_relu:
+            return F.relu(x + self.residual(x))
+        else:
+            return x + self.residual(x)
 
 
 # Transform image between classes: X -> Y
@@ -34,38 +38,44 @@ class Generator(nn.Module):
         
         # Make Encoder
         # Layer1
-        encoder_layers = [nn.ReflectionPad2d(3), nn.Conv2d(input_dimension, hidden_dimension, 7, 1, 0, bias=use_bias)]
-        encoder_layers += [nn.InstanceNorm2d(hidden_dimension), nn.ReLU(inplace=False)] if norm == nn.InstanceNorm2d else [nn.BatchNorm2d(hidden_dimension), nn.ReLU(inplace=False)]
-        
-        # Layer2
-        encoder_layers += [nn.ReflectionPad2d(1), nn.Conv2d(hidden_dimension, 2*hidden_dimension, 3, 2, 0, bias=use_bias)]
-        encoder_layers += [nn.InstanceNorm2d(2*hidden_dimension), nn.ReLU(inplace=False)] if norm == nn.InstanceNorm2d else [nn.BatchNorm2d(2*hidden_dimension), nn.ReLU(inplace=False)]
-        
-        # Layer3
-        encoder_layers += [nn.ReflectionPad2d(1), nn.Conv2d(2*hidden_dimension, 4*hidden_dimension, 3, 2, 0, bias=use_bias)]
-        encoder_layers += [nn.InstanceNorm2d(4*hidden_dimension), nn.ReLU(inplace=False)] if norm == nn.InstanceNorm2d else [nn.BatchNorm2d(4*hidden_dimension), nn.ReLU(inplace=False)]
-        self.encoder = nn.Sequential(*encoder_layers)
+        self.encoder = nn.Sequential(
+          nn.ReflectionPad2d(3),
+          nn.Conv2d(input_dimension, hidden_dimension, 7, 1, 0, bias=use_bias),
+          norm(hidden_dimension),
+          nn.ReLU(inplace=True),
 
-        # Make Residual(s)
+          nn.ReflectionPad2d(1),
+          nn.Conv2d(hidden_dimension, 2*hidden_dimension, 3, 2, 0, bias=use_bias),
+          norm(2*hidden_dimension),
+          nn.ReLU(inplace=True),
+
+          nn.ReflectionPad2d(1),
+          nn.Conv2d(2*hidden_dimension, 4*hidden_dimension, 3, 2, 0, bias=use_bias),
+          norm(4*hidden_dimension),
+          nn.ReLU(inplace=True),
+        )
+
+        # Make Residuals ... transform the image
         res_layers = []
         for _ in range(n_residuals):
-            res_layers.append(residual_block(hidden_dimension, use_bias))
+            res_layers.append(residual_block(hidden_dimension, use_bias, norm))
         self.residuals = nn.Sequential(*res_layers)
 
         # Make Decoder
-        # L1 - Deconv
-        decode_layers = [nn.ConvTranspose2d(4*hidden_dimension, 2*hidden_dimension, 3, 2, 1, output_padding=1, bias=use_bias)]
-        decode_layers += [nn.InstanceNorm2d(2*hidden_dimension), nn.ReLU(inplace=False)] if norm == nn.InstanceNorm2d else [nn.BatchNorm2d(2*hidden_dimension), nn.ReLU(inplace=False)]
-        
-        # L2 - Deconv
-        decode_layers += [nn.ConvTranspose2d(2*hidden_dimension, hidden_dimension, 3, 2, 1, output_padding=1, bias=use_bias)]
-        decode_layers += [nn.InstanceNorm2d(hidden_dimension), nn.ReLU(inplace=False)] if norm == nn.InstanceNorm2d else [nn.BatchNorm2d(hidden_dimension), nn.ReLU(inplace=False)]
-        
-        # L3 - Conv
-        decode_layers += [nn.ReflectionPad2d(3),
-                            nn.Conv2d(hidden_dimension, output_dimension, 7, 1, 0, bias=use_bias),
-                            nn.Tanh()]
-        self.decoder = nn.Sequential(*decode_layers)
+        # Decode
+        self.decoder = nn.Sequential(  
+            nn.ConvTranspose2d(4*hidden_dimension, 2*hidden_dimension, 3, 2, 1, output_padding=1, bias=use_bias),
+            norm(2*hidden_dimension),
+            nn.ReLU(inplace=True),
+
+            nn.ConvTranspose2d(2*hidden_dimension, hidden_dimension, 3, 2, 1, output_padding=1, bias=use_bias),
+            norm(hidden_dimension),
+            nn.ReLU(inplace=True),
+		
+            nn.ReflectionPad2d(3),
+            nn.Conv2d(hidden_dimension, output_dimension, 7, 1, 0),
+            nn.Tanh()
+        )
 
     def forward(self, x):
         # Encode
@@ -78,11 +88,4 @@ class Generator(nn.Module):
         x = self.decoder(x)
         return x
 
-"""
-# 64 - 128 - 256
-Z = random.random((1, 3, 256, 256))
-G = Generator(3, 3)
-Z = torch.from_numpy(Z).float()
-G(Z)
-"""
 

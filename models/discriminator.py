@@ -7,45 +7,35 @@ class Discriminator(nn.Module):
     def __init__(self, input_dimension):
         super(Discriminator, self).__init__()
 
+        # Fixed parameters
         hidden_dimension = 64
+        norm_layer = nn.BatchNorm2d
+        use_bias = norm_layer == nn.InstanceNorm2d
 
         self.convolutions = nn.Sequential(
-          nn.Conv2d(input_dimension, hidden_dimension, 4, 2, 0, bias=True),
-          #nn.BatchNorm2d(hidden_dimension),
-          nn.ReLU(inplace=False),
+          nn.Conv2d(input_dimension, hidden_dimension, 4, 2, 1, bias=use_bias),
+          nn.LeakyReLU(0.2, inplace=True),
 
-          nn.Conv2d(hidden_dimension, hidden_dimension, 4, 2, 0, bias=True),
-          nn.BatchNorm2d(hidden_dimension),
-          nn.ReLU(inplace=False),
+          nn.Conv2d(hidden_dimension, 2*hidden_dimension, 4, 2, 1, bias=use_bias),
+          nn.norm_layer(2*hidden_dimension),
+          nn.LeakyReLU(0.2, inplace=True),
 
-          nn.Conv2d(hidden_dimension, 2*hidden_dimension, 4, 2, 0, bias=True),
-          nn.BatchNorm2d(2*hidden_dimension),
-          nn.ReLU(inplace=False),
+          nn.Conv2d(2*hidden_dimension, 4*hidden_dimension, 4, 2, 1, bias=use_bias),
+          nn.norm_layer(4*hidden_dimension),
+          nn.LeakyReLU(0.2, inplace=True),
 
-          nn.Conv2d(2*hidden_dimension, 2*hidden_dimension, 4, 2, 0, bias=True),
-          nn.BatchNorm2d(2*hidden_dimension),
-          nn.ReLU(inplace=False),
-        )
+          nn.Conv2d(4*hidden_dimension, 8*hidden_dimension, 4, 2, 1, bias=use_bias),
+          nn.norm_layer(8*hidden_dimension),
+          nn.LeakyReLU(0.2, inplace=True),
 
-        self.output = nn.Sequential(
-          nn.Linear(4608, 512),
-          nn.ReLU(),
-          nn.Linear(512, 32),
-          nn.ReLU(),
-          nn.Linear(32, 1),
-          nn.Sigmoid(),
+          nn.Conv2d(8*hidden_dimension, 8*hidden_dimension, 4, 1, 1, bias=use_bias),
+          nn.norm_layer(8*hidden_dimension),
+          nn.LeakyReLU(0.2, inplace=True),
+
+          nn.Conv2d(8*hidden_dimension, 1, 4, 1, 1),
         )
 
 
     def forward(self, x):
         x = self.convolutions(x)
-        x = x.view(-1, 4608)
-        x = self.output(x)
         return x
-
-"""
-Z = random.random((1, 3, 128, 128))
-D = Discriminator(3)
-Z = torch.from_numpy(Z).float()
-D(Z) 
-"""

@@ -21,8 +21,13 @@ class Trainer():
     def __init__(self, config):
         self.batch_size = config.batchSize
         self.epochs = config.epochs
+
         self.use_cycle_loss = config.cycleLoss
+        self.cycle_multiplier = config.cycleMultiplier
+
         self.use_identity_loss = config.identityLoss
+        self.identity_multiplier = config.identityMultiplier
+
         self.load_models = config.loadModels
         self.data_x_loc = config.dataX
         self.data_y_loc = config.dataY
@@ -104,13 +109,15 @@ class Trainer():
         for epoch in range(self.epochs):
             print("======")
             print("Epoch {}!".format(epoch + 1))
+
+            # Paper reduces lr after 100 epochs
+            if epoch > 100:
+                self.scheduler_g.step()
+
             for (data_X, _), (data_Y, _) in zip(self.X_loader, self.Y_loader):      
                 data_X = data_X.to(self.device)
                 data_Y = data_Y.to(self.device)
 
-                # Paper reduces lr after 100 epochs
-                if epoch > 100:
-                    self.scheduler_g.step()
                 # =====================================
                 # Train Discriminators
                 # =====================================
@@ -119,7 +126,7 @@ class Trainer():
                 self.reset_gradients()
                 fake_X = self.G_X(data_Y)
                 out_fake_X = self.D_X(fake_X)
-                d_x_f_loss = torch.mean(out_fake_X**2) / 2
+                d_x_f_loss = torch.mean(out_fake_X**2) 
                 d_x_f_loss.backward()
                 self.d_optimizer.step()
 
@@ -127,21 +134,21 @@ class Trainer():
                 self.reset_gradients()
                 fake_Y = self.G_Y(data_X)
                 out_fake_Y = self.D_Y(fake_Y)
-                d_y_f_loss = torch.mean(out_fake_Y**2) / 2
+                d_y_f_loss = torch.mean(out_fake_Y**2) 
                 d_y_f_loss.backward()
                 self.d_optimizer.step()
 
                 # Train true X
                 self.reset_gradients()
                 out_true_X = self.D_X(data_X)
-                d_x_t_loss = torch.mean((out_true_X-1) ** 2) / 2
+                d_x_t_loss = torch.mean((out_true_X-1) ** 2) 
                 d_x_t_loss.backward()
                 self.d_optimizer.step()
 
                 # Train true Y
                 self.reset_gradients()
                 out_true_Y = self.D_Y(data_Y)
-                d_y_t_loss = torch.mean((out_true_Y-1) ** 2) / 2
+                d_y_t_loss = torch.mean((out_true_Y-1) ** 2) 
                 d_y_t_loss.backward()
                 self.d_optimizer.step()
 
@@ -161,7 +168,7 @@ class Trainer():
                 g_loss1 = torch.mean((out_fake_Y-1)**2)
                 if self.use_cycle_loss:
                     reconst_X = self.G_X(fake_Y)
-                    g_loss2 = 2 * torch.mean((data_X - reconst_X) ** 2)
+                    g_loss2 = self.cycle_multiplier * torch.mean((data_X - reconst_X) ** 2)
 
                 G_Y_losses.append([g_loss1.cpu().detach().numpy(), g_loss2.cpu().detach().numpy()])
                 g_loss = g_loss1 + g_loss2
@@ -177,7 +184,7 @@ class Trainer():
                 g_loss1 = torch.mean((out_fake_X-1)**2)
                 if self.use_cycle_loss:
                     reconst_Y = self.G_Y(fake_X)
-                    g_loss2 = 2 * torch.mean((data_Y - reconst_Y) ** 2)
+                    g_loss2 = self.cycle_multiplier * torch.mean((data_Y - reconst_Y) ** 2)
 
                 G_X_losses.append([g_loss1.cpu().detach().numpy(), g_loss2.cpu().detach().numpy()])
                 g_loss = g_loss1 + g_loss2
@@ -193,20 +200,20 @@ class Trainer():
 
                     # X should be same after G(X)
                     same_X = self.G_X(data_X)
-                    g_loss = torch.mean((data_X - same_X) ** 2)
+                    g_loss = self.identity_multiplier * torch.mean((data_X - same_X) ** 2)
                     g_loss.backward()
                     self.g_optimizer.step()
 
                     # Y should be same after G(Y)
                     same_Y = self.G_X(data_Y)
-                    g_loss = torch.mean((data_Y - same_Y) ** 2)
+                    g_loss = self.identity_multiplier * torch.mean((data_Y - same_Y) ** 2)
                     g_loss.backward()
                     self.g_optimizer.step()
 
-            print("Discriminator: {}".format(D_Y_losses[-5:]))
-            print("Generator: {}".format(G_Y_losses[-5:]))
-        # Epoch done, save models
-        self.save_models()
+            # Epoch done, save models
+            self.save_models()
+        
+        # Save losses
         np.save(self.model_path + 'losses/G_X_losses.npy', np.array(G_X_losses))
         np.save(self.model_path + 'losses/G_Y_losses.npy', np.array(G_Y_losses))
         np.save(self.model_path + 'losses/D_X_losses.npy', np.array(D_X_losses))
