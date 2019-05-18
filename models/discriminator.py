@@ -17,19 +17,19 @@ class Discriminator(nn.Module):
           nn.LeakyReLU(0.2, inplace=True),
 
           nn.Conv2d(hidden_dimension, 2*hidden_dimension, 4, 2, 1, bias=use_bias),
-          nn.norm_layer(2*hidden_dimension),
+          norm_layer(2*hidden_dimension),
           nn.LeakyReLU(0.2, inplace=True),
 
           nn.Conv2d(2*hidden_dimension, 4*hidden_dimension, 4, 2, 1, bias=use_bias),
-          nn.norm_layer(4*hidden_dimension),
+          norm_layer(4*hidden_dimension),
           nn.LeakyReLU(0.2, inplace=True),
 
           nn.Conv2d(4*hidden_dimension, 8*hidden_dimension, 4, 2, 1, bias=use_bias),
-          nn.norm_layer(8*hidden_dimension),
+          norm_layer(8*hidden_dimension),
           nn.LeakyReLU(0.2, inplace=True),
 
           nn.Conv2d(8*hidden_dimension, 8*hidden_dimension, 4, 1, 1, bias=use_bias),
-          nn.norm_layer(8*hidden_dimension),
+          norm_layer(8*hidden_dimension),
           nn.LeakyReLU(0.2, inplace=True),
 
           nn.Conv2d(8*hidden_dimension, 1, 4, 1, 1),
