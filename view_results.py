@@ -1,7 +1,6 @@
 import numpy as np
 
 import matplotlib.pyplot as plt
-
 from models.generator import Generator
 
 import torch
@@ -9,68 +8,57 @@ import torchvision
 import torch.nn as nn
 from torchvision import transforms
 
-batch_size = 8
-device = "cuda" if torch.cuda.is_available() else "cpu"
+import argparse
+import os
 
-G_Y = Generator(3, 3, nn.InstanceNorm2d)
-G_Y.load_state_dict(torch.load("./outputs/models/G_Y", map_location='cpu'))
-G_Y.to(device)
-
-# Data
-transform = transforms.Compose([
-    transforms.Resize((128, 128)),
-    transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
-])
-
-landscape_folder = torchvision.datasets.ImageFolder("./../data/landscapes/", transform)
-landscape_loader = torch.utils.data.DataLoader(landscape_folder, batch_size=batch_size, shuffle=True)
+"""
+Transform random image(s) from the input folder with generator thats given as input
+"""
 
 
-test = iter(landscape_loader)
-img_data,_ = next(test) 
-original1 = np.array(img_data[0])
-fake1 = np.array(G_Y(img_data[0].view(1, 3, 128, 128).to(device)).cpu().detach())[0]
+# Reads traning config and run!
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
 
-original2 = np.array(img_data[1])
-fake2 = np.array(G_Y(img_data[1].view(1, 3, 128, 128).to(device)).cpu().detach())[0]
+    parser.add_argument('--data', type=str, default="./../data/horse2zebra/horses")
+    parser.add_argument('--model', type=str, default="./outputs/models/G_Y")
+    parser.add_argument('--sample_n_images', type=int, default=1)
+    
+    image_width = image_height = 256
+    config = parser.parse_args()
+    output_folder = "./outputs/results/"
 
-original3 = np.array(img_data[2])
-fake3 = np.array(G_Y(img_data[2].view(1, 3, 128, 128).to(device)).cpu().detach())[0]
+    batch_size = config.sample_n_images
+    device = "cuda" if torch.cuda.is_available() else "cpu"
 
-# Transform to nice horsy  !!!!!! better transpose: transpose(1,2,0) !!!!!!
-original1 = original1.transpose()
-original1 = original1.transpose((1,0,2))
-original1 = original1 / 2 + 0.5
+    G = Generator(3, 3, nn.InstanceNorm2d) # You might have to change norm by yourself!
+    G.load_state_dict(torch.load(config.model, map_location='cpu'))
+    G.to(device)
 
-fake1 = fake1.transpose()
-fake1 = fake1.transpose((1,0,2))
-fake1 = fake1 / 2 + 0.5
+    # Data
+    transform = transforms.Compose([
+        transforms.Resize((image_width, image_height)),
+        transforms.ToTensor(),
+        transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    ])
 
-original2 = original2.transpose()
-original2 = original2.transpose((1,0,2))
-original2 = original2 / 2 + 0.5
+    data_folder = torchvision.datasets.ImageFolder("./../data/horse2zebra/horses", transform)
+    data_loader = torch.utils.data.DataLoader(data_folder, batch_size=batch_size, shuffle=True)
 
-fake2 = fake2.transpose()
-fake2 = fake2.transpose((1,0,2))
-fake2 = fake2 / 2 + 0.5
+    counter = 0
+    image_iter = iter(data_loader)
+    first_batch,_ = next(image_iter)
+    for image in first_batch:
+        original = np.array(image)
+        generated = np.array(G(image.view(1, 3, image_width, image_height).to(device)).cpu().detach())[0]
 
-original3 = original3.transpose()
-original3 = original3.transpose((1,0,2))
-original3 = original3 / 2 + 0.5
+        # Transform images back to (0-1) range
+        original = original.transpose((1,2,0))
+        original = original / 2 + 0.5
+        generated = generated.transpose((1,2,0))
+        generated = generated / 2 + 0.5
 
-fake3 = fake3.transpose()
-fake3 = fake3.transpose((1,0,2))
-fake3 = fake3 / 2 + 0.5
+        plt.imsave('{}/{}_original_image.png'.format(output_folder, counter), original)
+        plt.imsave('{}/{}_generated_image.png'.format(output_folder, counter), generated)
 
-fig, ((ax1, ax2), (ax3, ax4), (ax5, ax6)) = plt.subplots(3,2)
-ax1.imshow(original1)
-ax2.imshow(fake1)
-
-ax3.imshow(original2)
-ax4.imshow(fake2)
-
-ax5.imshow(original3)
-ax6.imshow(fake3)
-
-plt.show()
+        counter += 1

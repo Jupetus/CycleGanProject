@@ -7,6 +7,20 @@ import torch
 import argparse
 import os
 
+"""
+=====================================
+Replication of CycleGAN from: https://junyanz.github.io/CycleGAN/, made as part of a deep learning course
+
+Given Images from two domains X and Y, it will learn to transform image from one domain to another.
+
+Run the program with: python3 main.py --dataX={path to data folder X} --dataY={path to your data folder Y}
+
+Contributors: 
+    - Jukka Pajunen
+    - Roosa Piitulainen
+=====================================
+"""
+
 # Convert command line str argument to bool
 def str2bool(v):
     if v.lower() in ('yes', 'true', 't', 'y', '1'):
@@ -14,7 +28,7 @@ def str2bool(v):
     elif v.lower() in ('no', 'false', 'f', 'n', '0'):
         return False
 
-# Read traning config and run!
+# Reads traning config and run!
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     
@@ -30,9 +44,11 @@ if __name__ == '__main__':
     parser.add_argument('--cycleMultiplier', type=int, default=10)
 
     parser.add_argument('--identityLoss', type=str2bool, default=True)
-    parser.add_argument('--identityMultiplier', type=int, default=5)
+    parser.add_argument('--identityMultiplier', type=int, default=1)
     
     config = parser.parse_args()
+    
+    print("Training with: {}".format(config))
     
     trainer = Trainer(config)
     trainer.train()
