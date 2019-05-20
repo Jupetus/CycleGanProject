@@ -1,3 +1,7 @@
-# CYClEGAN implementation
+# CycleGAN implementation
 
-* [CycleGan](https://junyanz.github.io/CycleGAN/) - Link to original paper
+Implementation of CycleGan for CS-E4890 Deep Learning.
+
+* Link to original - [CycleGan](https://junyanz.github.io/CycleGAN/) 
+
+
